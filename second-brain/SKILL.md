@@ -1,6 +1,6 @@
 ---
 name: second-brain
-description: Retrieval, filing, and cross-chat memory discipline for the user's personal Second Brain - an Obsidian/markdown vault exposed through the Second-Brain MCP connector (search_notes, get_note, vault_map, create_note, edit_note, archive_chat). Use when the user mentions their notes, vault, or second brain; asks what they saved, wrote, or decided before; wants something saved, filed, or remembered; resumes earlier work or a past conversation; or when a substantive conversation produces decisions worth keeping. If the connector's tools are not available, guides the user to connect it.
+description: Retrieval, filing, organizing, and cross-chat memory discipline for the user's personal Second Brain - an Obsidian/markdown vault exposed through the Second-Brain MCP connector (search_notes, get_note, related_notes, vault_map, create_note, create_folder, edit_note, vault_move, archive_chat). Use when the user mentions their notes, vault, or second brain; asks what they saved, wrote, or decided before; wants something saved, filed, or remembered; wants a project/area/folder created, renamed, moved, or archived; resumes earlier work or a past conversation; or when a substantive conversation produces decisions worth keeping. If the connector's tools are not available, guides the user to connect it.
 license: MIT
 ---
 
@@ -17,11 +17,14 @@ vault carry the memory between conversations, models, and tools.
 
 ## Step 0 - confirm the tools exist
 
-Check whether the Second-Brain tools (`search_notes`, `get_note`, `vault_map`,
-`create_note`, `edit_note`, `archive_chat`) are available in this conversation.
-If they are not, say so plainly and point the user to
+Check whether the Second-Brain tools (`search_notes`, `get_note`,
+`related_notes`, `vault_map`, `create_note`, `create_folder`, `edit_note`,
+`vault_move`, `archive_chat`) are available in this conversation. If they are
+not, say so plainly and point the user to
 [references/connector-setup.md](references/connector-setup.md) - do not
 improvise vault access another way, and do not pretend to remember their notes.
+For exact parameter and result semantics of any tool, consult
+[references/tools.md](references/tools.md).
 
 ## The golden rule: smallest useful slice
 
@@ -29,12 +32,23 @@ Every retrieval follows this ladder - start at the top, escalate only when the
 current level genuinely can't answer:
 
 1. `search_notes` -> ranked snippets + summaries (almost always enough)
-2. `get_note` with `outline=true` -> just the headings of one note
-3. `get_note` with `section="<heading>"` -> one section
-4. `get_note` (full) -> the whole note, only when the above failed
+2. `related_notes` -> hop the wikilink graph from a hit (ids + titles only)
+3. `get_note` with `outline=true` -> just the headings of one note
+4. `get_note` with `section="<heading>"` -> one section
+5. `get_note` (full) -> the whole note, only when the above failed
 
 Never fetch a full note "for context". Never fetch several full notes when
 snippets already answered. Quote or cite the note `id` so the user can open it.
+
+## Hop the graph before reading more
+
+The vault is a linked graph, not a pile of files. When a search hit is close
+but you need its neighborhood - the project it belongs to, the sources it
+cites, the notes that cite *it* - call `related_notes(id)` instead of running
+more searches or fetching bodies. It returns outgoing wikilinks resolved to
+note ids, backlinks, and unresolved targets, for a few dozen tokens. Then
+fetch only the one neighbor that matters, at the lowest ladder rung that
+answers.
 
 ## Recalling knowledge
 
@@ -84,6 +98,37 @@ When the user wants something saved, filed, or remembered as a note:
    headed sections, no filler. The template and frontmatter are applied by the
    tool - don't duplicate title/tags/dates into the body.
 
+## Creating a project (or any folder)
+
+"Create a project for X in my second brain" is a two-step recipe:
+
+1. `create_folder(bucket="Projects", folder="X")` - makes the folder. If it
+   returns `status="exists"` (the name snapped to an existing folder), use
+   that folder instead of inventing a variant.
+2. `create_note(title="X", bucket="Projects", folder="X")` - the project's
+   overview note (goal, tasks, notes scaffold comes from the template).
+
+Same recipe for areas or any sub-structure the user asks for; `folder` can be
+a nested path like `"Historic Figures/Napoleon"`. Always `vault_map` first so
+you create into the real tree, not a guessed one.
+
+## Moving and archiving
+
+Use `vault_move(source, destination)` - it moves single notes **or whole
+folders**, and the vault's indexes refresh automatically:
+
+- Refile one note: `vault_move("Projects/X/idea.md", "Resources/idea.md")`.
+- Archive a finished project (the common case):
+  `vault_move("Projects/X", "Archives/X")` - the entire folder, notes and
+  all. Consider `edit_note` on its overview note first to set
+  `set_frontmatter` `status: done`.
+- Rename: move to the same folder with a new name.
+
+The destination must not already exist - on that error, pick a new name
+rather than overwriting. There is no hard-delete tool by design; when the
+user says "delete", propose archiving instead and let them do true deletions
+in Obsidian.
+
 ## Editing notes
 
 Use `edit_note` and send only the changed slice - never round-trip the whole
@@ -94,8 +139,7 @@ note:
 - `set_frontmatter` - merge metadata fields (its `tags` are governed the same
   way as create_note).
 
-For structural moves/renames use `vault_move`. There is no hard delete -
-suggest the user archive or move instead.
+For structural moves/renames see "Moving and archiving" above.
 
 ## Remembering this conversation
 
@@ -125,6 +169,7 @@ near-duplicate.
 ## Hard rules
 
 - Smallest useful slice, always. The escalation ladder is not optional.
+- Prefer a `related_notes` graph hop over another search or another fetch.
 - `vault_map` before every create; never invent buckets, folders, or tags.
 - Never `approve_new_tags=true` or `overwrite=true` without the user's
   explicit ok.

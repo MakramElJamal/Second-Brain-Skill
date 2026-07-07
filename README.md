@@ -27,12 +27,25 @@ things like:
 
 - *"what did I decide about the pitch deck?"* -> snippet-first search of notes
   **and** past-conversation archives, answers cite note ids
+- *"create a project for X"* -> a governed folder under Projects plus a
+  templated overview note, snapped to your existing tree
+- *"archive the X project"* -> the whole folder moves to Archives in one call,
+  indexes refresh themselves
 - *"save this as a resource note"* -> `vault_map` first, filed into an existing
   folder with approved tags, governance conflicts surfaced instead of forced
 - *"remember this conversation"* -> a distilled, searchable memory note
   (decisions / open questions / key points), not a transcript dump
+- *"what's connected to this note?"* -> a `related_notes` wikilink-graph hop
+  (ids + titles only) instead of fetching bodies
 
 …just works, in any chat where the skill and connector are enabled.
+
+Token tactics baked in: a snippet-first **escalation ladder** (search ->
+graph hop -> outline -> section -> full note, never "fetch for context"),
+**graph-over-grep** (the vault's wikilinks are a queryable knowledge graph via
+`related_notes`), and **progressive disclosure** (the skill body is one page;
+exact tool semantics live in `references/tools.md` and load only when
+needed).
 
 ## Install
 
@@ -66,6 +79,7 @@ at your Second-Brain URL.
 second-brain/
   SKILL.md                       # the skill: triggers + operating discipline
   references/
+    tools.md                     # exact tool semantics (loaded on demand)
     connector-setup.md           # loaded only when the connector is missing
 scripts/
   pack.ps1                       # zip the skill for claude.ai upload
